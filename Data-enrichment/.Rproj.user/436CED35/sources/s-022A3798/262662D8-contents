@@ -1,0 +1,1026 @@
+
+#Load packages -----------------------------------------------------------------
+library(tidyverse)
+library(readxl) # to import excel files
+library(haven) # to import spss and stata files
+library(lubridate)
+library(scales)
+library(foreign)
+library(Hmisc)
+library(mgcv)
+library(grid)
+library(gridExtra)
+library(rcompanion)
+library(lme4)
+library(broom)
+library(margins)
+library(ggeffects)
+Sys.setlocale("LC_TIME", "English") # Windows
+
+
+
+## ASSEMBLE DATASETS ---------------------------------------------------------
+# import and append csv files
+setwd("C:/Users/u1277277/surfdrive/Shared/Online survey methodology/Data package/Data_exp")
+files <- list.files()
+data <- lapply(files, read_csv)
+
+for (i in 1:length(data)){
+  data[[i]] <- cbind(data[[i]],files[i])
+  }
+
+data_append <- do.call("rbind", data) 
+colnames(data_append) <- c 
+colnames(data_append)[c(1,2)]<-c("email", "experiment")
+
+flag <- data_append$email[duplicated(data_append$email)]
+
+# create experimental condition identifiers
+data_append <- data_append %>%
+  separate(experiment, into = c("deadline", "rem1", "rem2", "rem3_ext"), sep = "-", remove = F) %>%
+  separate(rem3_ext, into = c("rem3", "ext"), sep = "[.]") %>%
+  separate(experiment, into = c("expgroup", "ext2"), sep = "[.]", remove = F) %>%
+  mutate(deadline = recode(deadline, "D" ="Deadline", "ND" = "No deadline"), 
+         rem1=as.numeric(rem1), 
+         rem2=as.numeric(rem2), 
+         rem3=as.numeric(rem3)) %>%
+  select(-c(ext, ext2))
+
+
+# Survey invitation 
+#Add experimental condition for invitation
+setwd("C:/Users/u1277277/surfdrive/Shared/Online survey methodology/Data package/ ")
+data_exp <- read_excel("data_qualtrics.xlsx")  %>%
+  separate(HourInv, into = c("a","hour0"), sep = " ", remove = F) %>%
+  separate(HourRem1, into = c("b","hour1"), sep = " ", remove = F) %>%
+  separate(HourRem2, into = c("c","hour2"), sep = " ", remove = F) %>%
+  separate(HourRem3, into = c("d","hour3"), sep = " ", remove = F) %>%
+  select(-c("a", "b", "c", "d" ))
+
+
+# merge experiment data 
+data_append <- data_append %>%
+  left_join(data_exp, by = c("expgroup" = "Group"))
+
+
+# Experiment invitation
+data_exp2 <- read_excel("Experimental_design2.xlsx",
+                       sheet = "Sheet1")  %>%
+  rename(dateinvite=Invitation, 
+         dater1=R1, 
+         dater2=R2, 
+         dater3=R3, 
+         datedeadline=Deadline, 
+         time=Time...8,
+         groupinvite=`Invitation D`, 
+         day=Time...1) %>%
+  separate(day, into = c("dayweek","hourgroup"), sep = "(?<=[A-Za-z])(?=[0-9])", remove = F) %>%
+  separate(time, into=c("dateexample", "timeday"), sep = "[ ]", remove = T) %>%
+  select(c("Group", "groupinvite"))
+
+data_append <- data_append %>%
+  left_join(data_exp2, by = c("expgroup" = "Group"))
+
+# 64 groups who were not in the randomization of header received the dutch - 
+# higher education header, thus fall under category 1
+data_append$groupinvite[is.na(data_append$groupinvite)] <- 1
+
+# import survey data 
+setwd("C:/Users/u1277277/surfdrive/Shared/Online survey methodology/Data package/")
+survey <- read_spss("Basedatabase.sav")
+
+# retain only uvt students
+survey <- survey %>%
+  separate(RecipientEmail, into = c("name", "uni"), sep = "@", remove = F)
+unique(survey$uni)
+survey <- survey %>%
+  dplyr:::filter(uni == "uvt.nl")
+
+# merge datasets 
+check <- unique(survey$RecipientEmail) %in% unique(data_append$email) 
+unique(survey$RecipientEmail)[!check]
+
+data_full <- data_append %>%
+  left_join(survey, by = c("email" = "RecipientEmail"))
+
+flag2 <- data_full$email[duplicated(data_full$email)]
+flagcheck <- flag %in% flag2
+unique(flag)[!flagcheck]
+
+# One email address, J.R.N.Mol@uvt.nl, is repeated three times in data_full. Probably
+# that is because they opened the survey invitation twice (double entry in survey data)
+
+# Groups D-5-6-6 and ND-5-5-5 contain same email addresses by 
+# mistake -> be dropped
+
+# Drop duplicate cases 
+data_full <- data_full[ !(data_full$email %in% flag2), ]
+
+
+# Group ND-6-5-5, D-3-4-4 and ND-3-4-4 Received invitation AND reminder on the 
+# same day -> dropped
+# Group D-14-3-3 only received one reminder -> drop
+
+todrop <- c("ND-6-5-5", "D-3-4-4", "ND-3-4-4", "D-14-3-3")
+data_full <- data_full[data_full$expgroup %nin% todrop, ]
+
+
+# Anonymize data + other edits
+data_full_anonymized <- data_full %>%
+  rename(id = email) %>%
+  dplyr::mutate(id = row_number(), 
+                groupinvite=as.character(groupinvite)) %>%
+  select(-c(name))
+#write.foreign(data_full, "data_full_anonymized.txt", "data_full_anonymized.sps", package="SPSS")
+
+# Close unnecessary dataset 
+rm(data, data_append, data_exp, data_exp2, data_full, survey, todrop, check, files, flag, flag2, flagcheck, i)
+
+# Drop some survey questions 
+data_full_anonymized <- data_full_anonymized %>%
+  select(-c(39:650))
+
+# Add variable identifying those who accessed the survey 
+data_full_anonymized$open <- 0
+data_full_anonymized$open[!is.na(data_full_anonymized$StartDate)] <- 1
+
+#write.foreign(data_full_anonymized, "data_full_anonymized.txt", "data_full_anonymized.sps", package="SPSS")
+
+# Data cleaning 
+data_full_anonymized <- data_full_anonymized %>%
+  rename(finished = Finished) %>%
+  mutate(open100 = open * 100, 
+         finished100 = finished * 100)
+
+data_full_anonymized$finished[is.na(data_full_anonymized$finished)] <- 0
+data_full_anonymized$finished100[is.na(data_full_anonymized$finished100)] <- 0
+
+data_full_anonymized <- data_full_anonymized %>%
+  mutate(groupinvite = as.factor(groupinvite), 
+         wday0 = weekdays.POSIXt(DateInv), 
+         wday1 = weekdays.POSIXt(DateRem1), 
+         wday2 = weekdays.POSIXt(DateRem2),
+         wday3 = weekdays.POSIXt(DateRem3)) %>%
+  rename(date0 = DateInv, date1 = DateRem1, 
+         date2 = DateRem2, date3 = DateRem3)
+
+data_full_anonymized <- data_full_anonymized %>%
+mutate(dayrem0 = 0, 
+       dayrem1 = dayrem0 + rem1, 
+       dayrem2 = dayrem1 + rem2,
+       dayrem3 = dayrem2 + rem3,
+       startdate = round_date(StartDate, "day"), 
+       sumdays = dayrem1 + dayrem2 + dayrem3) %>%
+  mutate(dayaccess =  as.numeric(difftime(startdate, 
+                                              date0, units = c("days"))), 
+         rem1_r = rem1, 
+         rem2_r = rem2, 
+         rem3_r = rem3)
+
+data_full_anonymized$rem1_r[data_full_anonymized$dayaccess < data_full_anonymized$dayrem1] <- NA
+data_full_anonymized$rem2_r[data_full_anonymized$dayaccess < data_full_anonymized$dayrem2] <- NA
+data_full_anonymized$rem3_r[data_full_anonymized$dayaccess < data_full_anonymized$dayrem3] <- NA
+
+# no. reminders 
+data_full_anonymized$reminders <- 0
+data_full_anonymized$reminders[!is.na(data_full_anonymized$rem1_r)] <- 1
+data_full_anonymized$reminders[!is.na(data_full_anonymized$rem2_r)] <- 2 
+data_full_anonymized$reminders[!is.na(data_full_anonymized$rem3_r)] <- 3
+
+# modify no. of remoinders for those who did not received them
+data_full_anonymized$reminders[data_full_anonymized$reminders==3 
+                                     & is.na(data_full_anonymized$date3)] <- 2
+data_full_anonymized$reminders[data_full_anonymized$reminders==2 
+                               & is.na(data_full_anonymized$date2)] <- 1
+
+
+count(data_full_anonymized, is.na(date1))
+
+# days until deadline
+data_full_anonymized <- data_full_anonymized %>%
+  mutate(daydeadline = rem1 + rem2 + (rem3*2))
+
+
+# RECODE timing 10:06 10:09 to 12:00:00
+count(data_full_anonymized, hour0)
+data_full_anonymized$hour0[data_full_anonymized$hour0=="10:06:00"] <- "12:00:00"
+data_full_anonymized$hour0[data_full_anonymized$hour0=="10:09:00"] <- "12:00:00"
+data_full_anonymized$wrongtiming[data_full_anonymized$expgroup=="D-4-10-10"] <- 1
+data_full_anonymized$wrongtiming[data_full_anonymized$expgroup=="ND-4-10-10"] <- 1
+
+count(data_full_anonymized, wday1)
+
+# levels weekdays
+list <- c("wday0", "wday1", "wday2", "wday3")
+for (i in list){
+  data_full_anonymized[, i] <- ordered(data_full_anonymized[,i], 
+                                          levels=c("Monday", "Tuesday", "Wednesday", "Thursday", 
+                                                   "Friday", "Saturday", "Sunday"))
+}
+count(data_full_anonymized, wday1)
+
+# CONTENT header
+data_full_anonymized$content[data_full_anonymized$groupinvite==1] <- 1
+data_full_anonymized$content[data_full_anonymized$groupinvite==2] <- 1
+data_full_anonymized$content[data_full_anonymized$groupinvite==3] <- 2
+data_full_anonymized$content[data_full_anonymized$groupinvite==4] <- 2
+# 1 GENERAL, 2 UVT
+
+
+# LANGUAGE header 
+data_full_anonymized$headlanguage[data_full_anonymized$groupinvite==1] <- 1
+data_full_anonymized$headlanguage[data_full_anonymized$groupinvite==3] <- 1
+data_full_anonymized$headlanguage[data_full_anonymized$groupinvite==2] <- 2
+data_full_anonymized$headlanguage[data_full_anonymized$groupinvite==4] <- 2
+# 1 Dutch, 2 Dutch/En
+
+data_full_language <- data_full_anonymized %>%
+  dplyr:::filter(!is.na(UserLanguage))
+
+count(data_full_language, UserLanguage)
+data_full_language$language <- data_full_language$UserLanguage 
+data_full_language$language[data_full_language$UserLanguage=='NL'] <- 'Dutch'
+data_full_language$language[data_full_language$UserLanguage=='NL-BE'] <- 'Dutch'
+data_full_language$language[data_full_language$UserLanguage=='EN'] <- 'English'
+data_full_language$language <- as.factor(data_full_language$language)
+
+
+
+# Data_open
+# Retain only cases that open the survey
+data_full_open <- data_full_anonymized %>%
+  dplyr:::filter(open==1)
+#data_semifull_open <- data_semifull_anonymized %>%
+#  filter(open==1)
+
+# data_access 
+## create dataset (long format) where units of analysis are invitations and reminders sent
+data_small <- data_full_anonymized %>%
+  select(id, expgroup, groupinvite, open, finished, 
+         date0, date1, date2, date3, hour0, hour1, hour2,hour3, startdate,
+         wday0, wday1, wday2, wday3, reminders, daydeadline, dayaccess)
+
+list <- c("date0", "date1", "date2", "date3", "hour0", "hour1", "hour2", 
+          "hour3", "wday0", "wday1", "wday2","wday3")
+
+# data_long --------------------
+data_long <- data_small %>%
+  reshape(varying=list, 
+          direction = "long", 
+          idvar = "id", 
+          sep="") 
+glimpse(data_long)
+
+#drop if startdate<date
+summary(data_long$startdate)
+data_long <- data_long  %>%
+  dplyr:::filter(is.na(startdate) | startdate >= date)
+data_long$success <- 0
+data_long$success[!is.na(data_long$startdate) &
+                      data_long$reminders==data_long$time] <- 1
+count(data_long, success)
+
+#listid1 <-  unique(data_full_anonymized$id[data_full_anonymized$open==1])
+#listid2 <- unique(data_long$id[data_long$success==1])
+#flagcheck <- listid1 %in% listid2
+#b <- listid1[!flagcheck]
+#b
+#data_full_anonymized$reminders[data_full_anonymized$id==b[1]]
+#data_long$success[data_full_anonymized$id==b[1]]
+#rm(listid1, listid2, flagcheck, b)
+
+data_long$wday <- ordered(data_long$wday, 
+                            levels=c("Monday", "Tuesday", "Wednesday", "Thursday", 
+                                     "Friday", "Saturday", "Sunday"))
+glimpse(data_long)
+
+# drop those with missing reminder
+data_long <- data_long %>%
+  filter(!is.na(date))
+
+# create weekday/weekend
+data_long$day[data_long$wday=="Monday"] <- "Weekday"
+data_long$day[data_long$wday=="Tuesday"] <- "Weekday"
+data_long$day[data_long$wday=="Wednesday"] <- "Weekday"
+data_long$day[data_long$wday=="Thursday"] <- "Weekday"
+data_long$day[data_long$wday=="Friday"] <- "Weekday"
+data_long$day[data_long$wday=="Saturday"] <- "Weekend"
+data_long$day[data_long$wday=="Sunday"] <- "Weekend"
+count(data_long)
+
+data_long <- data_long %>%
+  separate(expgroup, into = c("deadline", "rem1", "rem2", "rem3"), 
+           sep = "-", remove = F) 
+
+data_long <- data_long %>%
+  mutate(delay = 0) %>%
+  mutate(delay = ifelse(time==1, rem1, delay)) %>%
+  mutate(delay = ifelse(time==2, rem2, delay)) %>%
+  mutate(delay = ifelse(time==3, rem3, delay)) %>%
+  mutate(delay = as.numeric(delay)) 
+
+
+## labs
+
+deadline.labs <- c("Deadline", "No deadline")
+names(deadline.labs) <- c("D", "ND")
+rm(data_small, list)
+
+# open delay 
+open_delay <- data_full_anonymized %>% 
+  group_by(expgroup) %>% 
+  dplyr:::select(expgroup, open) %>% 
+  summarize_all(mean, na.rm = T) %>%
+  mutate(open = open * 100) %>%
+  separate(expgroup, into = c("deadline", "rem1", "rem2", "rem3"), sep = "-", remove = F)
+
+# open reminder 
+tot <- nrow(data_full_anonymized)
+
+## deadline only ---
+df_d <- data_full_anonymized %>%
+  filter(deadline=="Deadline")
+
+df_d$daydeadline_f <- NA
+df_d$daydeadline_f[df_d$daydeadline<=14] <- "below 14 days"
+df_d$daydeadline_f[df_d$daydeadline>14 & df_d$daydeadline<=28] <-  "15-28 days"
+df_d$daydeadline_f[df_d$daydeadline>28 & df_d$daydeadline<=56] <- "29+ days"
+df_d$daydeadline_f <- ordered(df_d$daydeadline_f,
+                              levels = c("below 14 days","15-28 days","29+ days" ))
+
+glimpse(df_d)
+
+
+# review -------------------------
+open_reminder <- data_full_anonymized %>%
+  mutate(reminders=ifelse(open==0, 3, reminders)) %>%
+  group_by(reminders) %>% 
+  dplyr:::select(reminders, open) %>% 
+  count(open) %>%
+  group_by(open) %>%
+  mutate(n_group = sum(n), 
+         n_cum = cumsum(n), 
+         rr=n_cum/tot*100)
+# group level
+open_delay <- open_delay %>%
+  mutate(rem1 = as.numeric(rem1), 
+         rem2 = as.numeric(rem2), 
+         rem3 = as.numeric(rem3)) %>%
+  mutate(daydeadline = rem1 + rem2 + (rem3*2))
+summary(open_delay$daydeadline)
+
+
+#  DESCRIPTIVE ACCESS experimental group -----------------------------------------
+
+# table 1 ----------
+table1 <- table(data_full_anonymized$rem1,data_full_anonymized$rem2,
+                 data_full_anonymized$deadline) # A will be rows, B will be columns
+table1
+
+count(data_full_open, reminders)
+tot <- sum(data_full_open$reminder)
+totpop <- nrow(data_full_anonymized)
+501/totpop*100
+310/totpop*100
+222/totpop*100
+216/totpop*100
+
+# table 2 descriptives -------
+summary(open_delay$open)
+sd(open_delay$open)
+
+
+summary(data_full_anonymized$open)
+summary(data_full_anonymized$content)
+count(data_full_anonymized, content)
+summary(data_full_anonymized$headlanguage)
+count(data_full_anonymized, headlanguage)
+
+summary(data_full_anonymized$deadline)
+count(data_full_anonymized, deadline)
+
+prop.table(table(data_full_language$language))
+
+summary(data_full_anonymized$daydeadline[data_full_anonymized$deadline=="Deadline"])
+sd(data_full_anonymized$daydeadline[data_full_anonymized$deadline=="Deadline"])
+count(data_full_anonymized, deadline)
+
+summary(data_full_anonymized$dayaccess[data_full_anonymized$open==1])
+sd(data_full_anonymized$dayaccess[data_full_anonymized$open==1])
+
+
+summary(data_full_anonymized$daydeadline[data_full_anonymized$open==1 & data_full_anonymized$deadline=="Deadline"])
+sd(data_full_anonymized$daydeadline[data_full_anonymized$open==1 & data_full_anonymized$deadline=="Deadline"])
+
+
+summary(data_full_open$daydeadline)
+sd(data_full_open$daydeadline)
+
+
+count(data_full_open, deadline)
+prop.table(table(df_d$daydeadline_f))
+summary(data_full_anonymized$reminders[data_full_anonymized$open==1 & data_full_anonymized$deadline=="Deadline"])
+sd(data_full_anonymized$reminders[data_full_anonymized$open==1 & data_full_anonymized$deadline=="Deadline"])
+
+
+
+count(data_long, success)
+prop.table(table(data_long$deadline))
+summary(data_long$delay)
+sd(data_long$delay)
+
+prop.table(table(data_long$time))
+prop.table(table(data_long$wday))
+prop.table(table(data_long$hour))
+prop.table(table(data_long$deadline))
+
+overdeadline <- data_full_anonymized %>%
+  filter(deadline == "Deadline") %>%
+  filter(dayaccess>daydeadline)
+overdeadline
+
+
+### Figure 2 ------------------------------------------------------------------
+# Access rate by experiment group  
+meanopen <- mean(open_delay$open)
+ggplot(data = open_delay, aes(x = reorder(expgroup, +open), 
+                              y = open)) +
+  geom_col(fill = "grey50") +
+  geom_hline(yintercept = meanopen, color="grey13", lty=2, size=1) +
+  labs(y = "% Participating", x = "Experimental group") + 
+  theme_classic() +
+  theme(axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom", 
+        legend.title = element_text(),
+        plot.title = element_blank()) 
+ggsave("Figures/Figure2.emf", plot = last_plot())  
+ggsave("Submission to SSCR/Figures/Fig2.tiff", plot = last_plot())  
+
+summary(open_delay$open)
+sd(open_delay$open)
+
+
+### Figure 3 --------------------------------------------------
+# Day of access 
+g1 <- ggplot(data = data_full_anonymized, aes(x = dayaccess)) + 
+  geom_bar(fill = "grey50" ) + 
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 90), 
+        legend.position = "bottom", 
+        legend.title = element_text(),
+       plot.title = element_text(hjust=0.5)) + 
+    labs(title = "a", 
+       y = "No. of respondents", x = "No. of days") 
+#ggsave("Figures/Access_delay_distribution.emf", plot = last_plot())  
+summary(data_full_anonymized$dayaccess)
+
+## Relative addition at each reminder
+reminders.labs <- c("Invitation", "Rem. 1", "Rem. 2", "Rem. 3", "Deadline")
+
+op <- open_reminder %>%
+  mutate(reminders = ifelse(open == 0, 4, reminders))
+g2 <- ggplot(data = op, aes(x = reminders, y = rr)) +
+  geom_step(stat="identity", size=1, color="grey50")   +
+  theme_classic() +
+  labs(y='% Participating', x = "Contact attempt", title = "b") +
+  theme(axis.text.x = element_text(), 
+        legend.position = "none", 
+        plot.title = element_text(hjust=0.5)) +
+  ylim(c(0, 10)) + 
+  scale_x_continuous(breaks=c(0, 1, 2, 3, 4), 
+                     labels = reminders.labs)
+#ggsave("Figures/Access_general2.emf", plot = last_plot()) 
+g2
+
+
+g1 
+g2
+g <- grid.arrange(g1, g2, ncol = 2)
+ggsave("Figures/Figure3.emf", g, width = 10) 
+ggsave("Submission to SSCR/Figures/Fig3.tiff", plot = last_plot())  
+
+
+## Figure 4  -------------------------------------------------
+### Opening rate by days 
+open_date <- data_full_anonymized %>% 
+  group_by(date0, startdate) %>% 
+  dplyr:::select(startdate, open, date0) %>% 
+  count(open) %>%
+  group_by(date0)%>%
+  mutate(n_group = sum(n), 
+         n_cum = cumsum(n), 
+         rr = n_cum/n_group) %>%
+  dplyr:::filter(!is.na(startdate))
+
+ggplot(data = open_date, aes(x = as_date(startdate), y = n_cum, color=as.factor(date0))) +
+  geom_rect(data = open_date, 
+            aes(xmin = as.Date("2019-05-30", "%Y-%m-%d"), 
+                xmax = as.Date("2019-06-01",  "%Y-%m-%d"),
+                ymin = -Inf, 
+                ymax = Inf), 
+            fill='grey83', color='grey83') +
+  geom_rect(data = open_date, 
+            aes(xmin = as.Date("2019-06-10", "%Y-%m-%d"), 
+                xmax = as.Date("2019-06-11",  "%Y-%m-%d"),
+                ymin = -Inf, 
+                ymax = Inf), 
+            fill='grey83', color='grey83') +
+  geom_rect(data = open_date, 
+            aes(xmin = as.Date("2019-06-11", "%Y-%m-%d"), 
+                xmax = as.Date("2019-07-02",  "%Y-%m-%d"),
+                ymin = -Inf, 
+                ymax = Inf), 
+            fill='grey93', color='grey93') +
+  geom_step(size=.8) + 
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        legend.position = "none", 
+        plot.title = element_blank()) + 
+  scale_x_date(date_breaks = "2 days", labels = date_format("%b %d")) +
+  labs(x = "Date",
+       y = "Cumulative no. of participants") + 
+  scale_color_grey(end = 0.65)
+
+ggsave("Figures/dates.emf", plot = last_plot()) 
+ggsave("Submission to SSCR/Figures/Fig4.tiff", plot = last_plot())  
+
+str(open_date$startdate)
+
+
+
+##### ANALYSES ----------------------------------------------------------------
+### Access by header 
+table(data_full_anonymized$finished)
+
+tableheader <- table(data_full_anonymized$groupinvite, data_full_anonymized$open)
+tableheader
+margin.table(tableheader, 1)
+prop.table(tableheader, 1)
+chisq.test(tableheader)
+
+# 1	Dutch general
+# 2	Dutch - English general
+# 3	Dutch UVT
+# 4	Dutch - English UVT
+
+
+
+# Table 3 --------------------
+tablecontent <- table(data_full_anonymized$content, data_full_anonymized$open)
+tablecontent
+margin.table(tablecontent, 1)
+prop.table(tablecontent, 1)
+chisq.test(tablecontent)
+
+tablelanguage <- table(data_full_anonymized$headlanguage, data_full_anonymized$open)
+tablelanguage
+prop.table(tablelanguage, 1)
+margin.table(tablelanguage, 1)
+chisq.test(tablelanguage)
+
+tabledeadline <- table(data_full_anonymized$deadline, data_full_anonymized$open)
+prop.table(tabledeadline, 1)
+margin.table(tabledeadline, 1)
+chisq.test(tabledeadline)
+
+## Table 4 ----------------
+sl1 <- glm(open ~ groupinvite, data = data_full_anonymized, 
+           family = "binomial"(link="logit"))
+summary(sl1)
+nagelkerke(sl1)
+
+
+#sl2 <- glm(open ~ content*headlanguage, data = data_full_anonymized, 
+#           family = "binomial"(link="logit"))
+#summary(sl2)
+#nagelkerke(sl2)
+
+## Figure 5 ----------
+
+tablelanguage2 <- table(data_full_language$language, data_full_language$headlanguage)
+prop.table(tablelanguage2, 2)
+chisq.test(tablelanguage2)
+
+tot_1 = nrow(data_full_language[data_full_language$headlanguage == 1, ])
+tot_2 = nrow(data_full_language[data_full_language$headlanguage == 2, ])
+
+data_full_language <- data_full_language %>%
+  dplyr:::select(headlanguage, language) %>%
+  group_by(language, headlanguage) %>%
+  summarise(count=n())
+
+data_full_language$perc <- 0 
+#data_full_language$perc[data_full_language$headlanguage==1] <- (data_full_language$count/tot_1)*100 
+
+data_full_language$perc[data_full_language$headlanguage==1] <- 
+  data_full_language$count[data_full_language$headlanguage==1]/tot_1 *100
+
+data_full_language$perc[data_full_language$headlanguage==2] <- 
+  data_full_language$count[data_full_language$headlanguage==2]/tot_2 *100
+
+str(data_full_language$language)
+ggplot(data_full_language, aes(x=as.factor(headlanguage), y=perc, fill = language)) +
+  geom_col(position = "dodge") +
+  scale_x_discrete(breaks=c(1, 2),
+                   labels = c("Dutch only", "Dutch + English")) + 
+  scale_fill_grey() +
+  labs(y = "%", x = "Language of subject line", fill = "Language of completion")   + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(), 
+        legend.title = element_text(), 
+        legend.position = "bottom", 
+        plot.title = element_blank()) 
+ggsave("Figures/Figure5.emf", plot = last_plot())
+ggsave("Submission to SSCR/Figures/Fig5.tiff", plot = last_plot())  
+
+
+## table 5 Deadline ------------------
+summary(data_full_anonymized)
+
+logit1 <- glm(open ~ deadline + wday0 + hour0, data = data_full_anonymized, 
+              family = "binomial"(link="logit"))
+summary(logit1)
+nagelkerke(logit1)
+
+l1 <- glm(open ~ daydeadline + wday0 + hour0, data = df_d, 
+              family = "binomial"(link="logit"))
+summary(l1)
+
+
+
+### Figure 6 ----
+#plot margins
+## see https://cran.r-project.org/web/packages/margins/vignettes/Introduction.html
+x1 <- glm(open ~ daydeadline + wday0 + hour0 +groupinvite, data = df_d, 
+          family = "binomial"(link="logit"))
+summary(x1)
+cdat1 <- cplot(x1, "daydeadline", what = "prediction")
+
+head(cdat1)
+dayd1 <- ggplot(cdat1, aes(x = xvals)) + 
+  geom_line(aes(y = yvals)) +
+  geom_ribbon(aes(ymin=lower,ymax=upper),alpha=0.3) +
+  geom_hline(yintercept = 0) +
+  labs(x = "Days until deadline", y = "Predicted participation", title="a") +
+  theme_classic() +
+  theme(plot.title=element_text(hjust=0.5))
+dayd1
+ggsave("Figures/figure6a.png", dayd1)
+
+pred_6a <- cdat1
+
+# curvilinear
+options(scipen = 99999)
+x <- glm(open ~ daydeadline + I(daydeadline^2) + wday0 + hour0 + groupinvite , data = df_d, 
+         family = "binomial"(link="logit"))
+summary(x)
+#margins(x)
+#cplot(x, "daydeadline")
+cdat <- cplot(x, "daydeadline", what = "prediction")
+
+head(cdat)
+dayd2 <- ggplot(cdat, aes(x = xvals)) + 
+  geom_line(aes(y = yvals)) +
+  geom_ribbon(aes(ymin=lower,ymax=upper),alpha=0.3) +
+  geom_hline(yintercept = 0) +
+  labs(x = "Days until deadline", y = "Predicted participation", title="b") +
+  theme_classic() +
+  theme(plot.title=element_text(hjust=0.5))
+dayd2
+ggsave("Figures/figure6b.png", dayd1)
+
+dayd <- grid.arrange(dayd1, dayd2)
+dayd
+ggsave("Figures/figure6.png", dayd, width = 9.5)
+ggsave("Submission to SSCR/Figures/Fig6.tiff", plot = last_plot())  
+
+
+### Figure  7----
+data_full_open2 <- df_d %>%
+  filter(open==1)
+summary(rem1 <- lm(reminders ~ daydeadline_f + wday0 + hour0 + groupinvite, data=data_full_open2 ))
+rem1yhat <- ggpredict(rem1, "daydeadline_f")
+as.data.frame(rem1yhat)
+
+ggplot(rem1yhat, aes(x, predicted)) +
+  geom_point(size=3) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) +
+  geom_hline(yintercept = 0) +
+  labs(x = "Days until deadline", y = "Predicted no. of reminders before participation") +
+  theme_classic() +
+  theme(plot.title=element_text(hjust=0.5)) 
+ggsave("Figures/figure7.png", plot=last_plot(), width = 9)
+ggsave("Submission to SSCR/Figures/Fig7.tiff", plot = last_plot())  
+
+
+
+## Figure 8 ---
+
+g11 <- ggplot(open_delay, aes(x = rem1, y = open)) + 
+  geom_point() +
+  geom_smooth(method = "loess", color = "grey35" ) +
+  facet_grid(. ~ deadline, labeller = labeller(deadline=deadline.labs)) +
+  theme_classic() +
+  labs(x = "Days between invitation and reminder 1", y = "% Participating")
+g12 <- ggplot(open_delay, aes(x = rem2, y = open)) + 
+  geom_point() +
+  geom_smooth(method = "loess", color = "grey35") +
+  facet_grid(. ~ deadline, labeller = labeller(deadline=deadline.labs)) +
+  theme_classic() +
+  labs(x = "Days between reminder 1 and reminder 2", y = "% Participating")
+g10 <- grid.arrange(g11, g12)
+g10
+ggsave("Figures/figure8.png", g10)
+ggsave("Submission to SSCR/Figures/Fig8.tiff", plot = last_plot())  
+
+
+
+###  Table 5 Discrete time hazard models -------------------------------------------
+m1 <- glm(success ~ factor(time) + delay + deadline + factor(wday) + factor(hour) + factor(groupinvite),
+          data = data_long, family = "binomial"(link = "logit"))
+m2 <- glm(success ~ factor(time) + delay + I(delay^2) + deadline + factor(wday) + factor(hour) + factor(groupinvite),
+          data = data_long, family = "binomial"(link = "logit"))
+m3 <- glm(success ~ factor(time) + delay*deadline + factor(wday) + factor(hour) + factor(groupinvite),
+          data = data_long, family = "binomial"(link = "logit"))
+
+count(data_long, success)
+summary(m1)
+nagelkerke(m1)
+summary(m2)
+nagelkerke(m2)
+summary(m3)
+nagelkerke(m3)
+
+
+m1b <- glm(success ~ time + I(time^2) + delay + deadline + factor(wday) + factor(hour) + factor(groupinvite),
+           data = data_long, family = "binomial"(link = "logit"))
+m2b <- glm(success ~ time + I(time^2) + delay + I(delay^2) + deadline + factor(wday) + factor(hour) + factor(groupinvite),
+           data = data_long, family = "binomial"(link = "logit"))
+m3b <- glm(success ~ time + I(time^2) + delay*deadline + factor(wday) + factor(hour) + factor(groupinvite),
+           data = data_long, family = "binomial"(link = "logit"))
+
+count(data_long, success)
+summary(m1b)
+nagelkerke(m1b)
+summary(m2b)
+nagelkerke(m2b)
+summary(m3b)
+nagelkerke(m3b)
+
+## Figure 9 ----
+# daydeadline > dayaccess
+# n = 1249
+### daydeadline*deadline
+summary(data_full_anonymized$dayaccess)
+l2 <- lm(dayaccess ~ daydeadline*deadline + I(daydeadline^2)*deadline + 
+           wday0 + hour0 + groupinvite, data = data_full_anonymized)
+summary(l2)
+
+d2 <- ggpredict(l2, terms = c("daydeadline", "deadline"))
+head(d2, 30)
+ggplot(d2, aes(x, predicted)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = .1) +
+  geom_hline(yintercept = 0) +
+  labs(x = "Days until deadline", y = "Predicted day of access") +
+  theme_classic() +
+  facet_grid(~ group) +
+  theme(plot.title=element_text(hjust=0.5)) + 
+  xlim(8, 56)
+ggsave("Figures/figure9.png", plot = last_plot())
+ggsave("Submission to SSCR/Figures/Fig9.tiff", plot = last_plot())  
+
+as.data.frame(d2)
+
+
+
+#### Appendix A -----
+ggplot(data = data_full_anonymized, aes(x = wday0, 
+                                            y = open100, fill = hour0)) +
+  stat_summary(geom = "bar", fun.y = mean, position="dodge") +
+  stat_summary(geom = "errorbar", fun.data = mean_se, position=position_dodge(0.9),  size = 1, width = 0) + 
+  labs(title = "Access rate by timing of first invitation", 
+       y = "% Participating", x = "Day of the week of first invitation", 
+       fill = "Hour at first invitation")   + 
+  scale_fill_grey() +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45), 
+        legend.title = element_text(), 
+        legend.position = "bottom",
+        plot.title=element_blank())
+ggsave("Figures/figureA1.png", plot = last_plot())
+ggsave("Submission to SSCR/Figures/FigA1.tiff", plot = last_plot())  
+
+
+
+
+
+
+
+
+
+#### Appendix maybe?? ----
+### Hazard function
+
+### Additional analyses ---- how to specify hazard function
+#Follow: https://rpubs.com/corey_sparks/63970#:~:text=R%20provides%20a%20useful%20function,continuous%20duration%20into%20discrete%20periods.&text=We%20see%20that%20each%20child,out%20of%20the%20risk%20set.
+fit.0<-glm(success~as.factor(time)-1, family="binomial", data = data)
+summary(fit.0)
+# -1 is to avoid intercept and get estimate for each time
+
+# try other hazard functions
+#Linear term for time
+fit.l<-glm(success~time, family="binomial", data = data)
+summary(fit.l)
+
+# quadratic
+fit.s<-glm(success~time+I(time^2), family="binomial", data = data)
+summary(fit.s)
+
+# cubic
+fit.c<-glm(success~time+I(time^2)+I(time^3 ), family="binomial", data = data)
+summary(fit.c)
+
+# log
+fit.log<-glm(success~time+I(log(time+1)), family="binomial", data = data)
+summary(fit.log)
+
+
+
+dat<-expand.grid(time=seq(0, 3, 1))
+dat$genmod<-predict(fit.0, newdata=dat, type="response")
+dat$lin<-predict(fit.l, newdata=dat, type="response")
+dat$sq<-predict(fit.s, newdata=dat, type="response")
+dat$cub<-predict(fit.c, newdata=dat, type="response")
+dat$log<-predict(fit.log, newdata=dat, type="response")
+
+plot(genmod~time, dat, type="l", ylab="h(t)", xlab="Time", lwd=1)
+title(main="Hazard function from different time parameterizations")
+lines(lin~time, dat, col=2, lwd=2)
+lines(sq~time, dat, col=3, lwd=2)
+lines(cub~time, dat, col=4, lwd=2)
+lines(log~time, dat, col=5, lwd=2)
+legend("topright", legend=c("General Mod.", "Linear", "Square", " Cubic", "Logarithmic"), col=1:6, lwd=1.5)
+
+
+aic<-round(c(
+  fit.0$deviance+2*length(fit.0$coefficients),
+  fit.l$deviance+2*length(fit.l$coefficients),
+  fit.s$deviance+2*length(fit.s$coefficients),
+  fit.c$deviance+2*length(fit.c$coefficients), 
+  fit.log$deviance+2*length(fit.log$coefficients)), 2)
+dif.aic<-round(aic-aic[4],2)
+data.frame(model =c("general", "linear", "square", "cubic", "log"), aic=aic, aic_dif=dif.aic)
+
+
+
+
+
+#######
+
+
+count(df_d,daydeadline_f) 
+         
+
+x1 <- glm(open ~ daydeadline_f + wday0 + hour0 , data = df_d, 
+          family = "binomial"(link="logit"))
+summary(x1)
+cdat1 <- cplot(x1, "daydeadline_f", what = "prediction")
+cdat2 <- ggpredict(x1, terms= c("daydeadline_f"))
+cdat2
+
+head(cdat1)
+dayd1 <- ggplot(cdat1, aes(x = xvals)) + 
+  geom_line(aes(y = yvals)) +
+  geom_ribbon(aes(ymin=lower,ymax=upper),alpha=0.3) +
+  geom_hline(yintercept = 0) +
+  labs(x = "Days until deadline", y = "Predicted participation", title="a") +
+  theme_classic() +
+  theme(plot.title=element_text(hjust=0.5))
+dayd1
+ggsave("Figures/figure8a.png", dayd1)
+
+
+### Cite packages ---
+
+citation("tidyverse")
+citation("readxl")
+citation("haven")
+citation("lubridate")
+citation("scales")
+citation("foreign")
+citation("Hmisc")
+#citation("mgcv")
+citation("grid")
+citation("gridExtra")
+citation("rcompanion")
+#citation("lme4")
+#citation("broom")
+citation("margins")
+citation("ggeffects")
+
+
+
+######### END ------------------------
+summary(data_full_anonymized$dayaccess)
+l1 <- lm(dayaccess ~ daydeadline + I(daydeadline^2) + wday0 + hour0 + groupinvite, data = df_d)
+summary(l1)
+
+d <- ggpredict(l1, terms = c("daydeadline"))
+head(d, 30)
+ggplot(d, aes(x, predicted)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = .1) +
+  geom_hline(yintercept = 0) +
+  labs(x = "Days until deadline", y = "Predicted day of access") +
+  theme_classic() +
+  theme(plot.title=element_text(hjust=0.5)) + 
+  xlim(8, 56)
+ggsave("Figures/figure9.png", plot = last_plot())
+
+
+open_delay <- open_delay %>%
+  mutate(delay = case_when(rem1 <=7 & rem2<=7 ~ "short-short", 
+                           rem1 <=7 & rem2>7 ~ "short-long", 
+                           rem1 >7 & rem2<=7 ~ "long-short", 
+                           rem1 >7 & rem2>7 ~ "long-long")) %>%
+  mutate(delay = as.factor(delay))
+## delay
+# 1 short-short
+# 2 short - long
+# 3 long - short
+# 4 long - long
+
+
+l2 <- lm(open ~ delay*deadline, data = open_delay)
+summary(l2)
+
+dat3 <- ggpredict(l2, c("delay", "deadline"))
+head(dat3, 10)
+ggplot(dat3, aes(x = x, y = predicted)) + 
+  #geom_bar(aes(y = fit), stat="identity") +
+  #geom_ribbon(aes(ymin=lwr,ymax=upr),alpha=0.3) +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high, color= group), position = position_dodge(width = 0.5)) +
+  geom_hline(yintercept = 0) +
+  labs(x = "Delay between reminders", y = "Predicted participation rate") +
+  theme_classic() +
+  theme(plot.title=element_text(hjust=0.5))
+ggsave("Figures/figure10.png", plot = last_plot())
+
+
+l2 <- glm(open ~ rem1*deadline + rem2*deadline , data = data_full_anonymized, family=binomial(link="logit"))
+summary(l2)
+
+dat3 <- ggpredict(l2, c("rem1", "deadline"))
+head(dat3, 10)
+rem1 <- ggplot(dat3, aes(x = x, y = predicted, fill = group)) + 
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.3) +
+  geom_hline(yintercept = 0) +
+  labs(x = "Delay between reminders", y = "Predicted participation rate") +
+  theme_classic() +
+  theme(plot.title=element_text(hjust=0.5))
+rem1
+
+dat4 <- ggpredict(l2, c("rem2", "deadline"))
+head(dat4, 10)
+rem2 <- ggplot(dat4, aes(x = x, y = predicted, fill = group)) + 
+  geom_line() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.3) +
+  geom_hline(yintercept = 0) +
+  labs(x = "Delay between reminders", y = "Predicted participation rate") +
+  theme_classic() +
+  theme(plot.title=element_text(hjust=0.5))
+rem2
+rem12 <- grid.arrange(rem1, rem2)
+
+ggsave("Figures/figure11.png", plot = last_plot())
+
+
+
+
+### Table 5 --------
+str(data$time)
+options(scipen=999)
+
+data <- data_long %>%
+  mutate(monday = ifelse(wday == "Monday", 1, 0), 
+         tuesday = ifelse(wday == "Tuesday", 1, 0), 
+         wednesday = ifelse(wday == "Wednesday", 1, 0), 
+         thursday = ifelse(wday == "Thursday", 1, 0), 
+         friday = ifelse(wday == "Friday", 1, 0), 
+         saturday = ifelse(wday == "Saturday", 1, 0),
+         sunday = ifelse(wday == "Sunday", 1, 0)) %>%
+  mutate(midnight = ifelse(hour == "00:00:00", 1, 0),
+         morning = ifelse(hour == "06:00:00", 1, 0),
+         noon = ifelse(hour == "12:00:00", 1, 0),
+         evening = ifelse(hour == "18:00:00", 1, 0))
+
+head(data)
+mod1 <- glm(success ~ factor(time) + delay + deadline*daydeadline 
+          + groupinvite + tuesday + wednesday + thursday +
+            friday + saturday + sunday + midnight + noon + evening, 
+          data = data, family = "binomial"(link="logit"))
+
+summary(mod1)

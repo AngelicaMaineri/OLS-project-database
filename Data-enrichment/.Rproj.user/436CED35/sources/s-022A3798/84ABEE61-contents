@@ -1,0 +1,403 @@
+library(tidyverse)
+library(dplyr)
+
+####
+data <- read_delim("v2-ODISSEI Infrastructure Survey  (Responses) - raw responses.csv")
+cols = colnames(data)
+
+new_cols = c("date", "privacy", "affiliation", "position", "discipline", 
+             "rdm_aspects", "challenge_FAIR", "challenge_OS", "challenge_gdpr", 
+             "challenge_anonymization", "challenge_storage","challenge_license", 
+             "challenge_dmworkflow", "challenge_dmp", "challenge_analysis", 
+             "challenge_extra", "challenge_details", "useful_webpage", 
+             "useful_elaborate", "resources_select", "resources_extra", 
+             "know_odissei", "know_odissei_how", "future_contact", 
+             "email", "extra_comments")
+
+colnames(data) <- new_cols
+count(data, affiliation) %>% print(n=30)
+count(data, email) %>% print(n=30)
+
+count(data, position)
+
+odisseiblue = c('#007aa9')
+
+
+
+# check for duplicates
+duplicated(data)
+
+# duplicate email
+subset <- data %>%
+  filter(email=="c.hofhuizen@nivel.nl")
+
+# drop older entry
+data$drop <- 0
+data$drop[data$email=="c.hofhuizen@nivel.nl" & data$date=="13/12/2021 12:45:24"] <- 1
+data <- data %>% filter(drop==0)
+
+
+## add id ----
+data <- data %>% mutate(id = row_number())
+
+
+## Discipline ------ 
+discipline <- data$discipline
+count(data, discipline)
+
+df <- transform(data, 
+                  disc_ss = grepl("Social Sciences|all", discipline, ignore.case = T),
+                  disc_ec = grepl("Economics|all", discipline, ignore.case = T),
+                  disc_h  = grepl("Humanities|all", discipline, ignore.case = T), 
+                  disc_law = grepl("Law|all", discipline, ignore.case = T), 
+                  disc_other = grepl("Architecture|Medical|Administration|Environmental|Spacial", 
+                                    discipline, ignore.case = T))
+
+df
+
+disc_long <- df %>%
+  select(starts_with("disc_")) %>%
+  pivot_longer(
+    cols = starts_with("disc_"),
+    names_to = "disc",
+    names_pattern = "disc_?(.*)"
+  ) %>%
+  mutate(d=case_when(value ~ 1, 
+                     !value ~ 0))
+disc_long
+
+
+disc_short <- disc_long %>%
+  group_by(disc) %>%
+  count(d) %>%
+  filter(d==1)
+disc_short
+
+disc.labs <- c("Economics", "Humanities", "Law", "Other", "Social Sciences")
+names(disc.labs) <- c("ec", "h", "law", "other", "ss")
+
+
+ggplot(disc_short, aes(x = reorder(disc, +n),y = n)) +
+  geom_col(fill = odisseiblue) + 
+  labs(x = "Discipline", y = "n") +
+  scale_x_discrete(labels = disc.labs) + 
+  coord_flip() +
+  #coord_polar(theta = "x", direction = -1) + 
+  theme_classic()
+ggsave("discipline.jpg")
+
+# outside of ssh ---
+df2 <- df %>%
+  mutate(ss = case_when(
+    disc_ss | disc_ec ~ 1
+  )) %>%
+  print()
+
+count(df2, ss)
+
+
+data <- data %>%
+  full_join(df2, key=id)
+
+### Position -----
+count(data, position)
+
+dff <- data %>%
+  mutate(position_r = case_when(
+    grepl("Steward", position, ignore.case = T) ~ "Data steward",
+    grepl("Data Manager", position, ignore.case = T) ~ "Data Manager",
+    grepl("Consultant", position, ignore.case = T) ~ "Consultant",
+    TRUE ~ "Other"
+  )) 
+
+count(dff, position_r) 
+
+tpos <- as.data.frame(table(dff$position_r))
+tpos
+ggplot(tpos, aes(x = reorder(Var1, +Freq),y = Freq)) +
+  geom_col(fill = odisseiblue) + 
+  labs(x = "Position", y = "n") +
+  #scale_x_discrete(labels = disc.labs) + 
+  coord_flip() +
+  theme_classic()
+ggsave("position.jpg")
+
+
+### RDM aspects -----
+pull(data, rdm_aspects) # %>% print(n=30)
+
+
+rdm_df <- data %>% select(id, rdm_aspects)
+rdm_df <- transform(rdm_df, 
+                rdm_dmp = grepl("management plan", rdm_aspects, ignore.case = T), 
+                rdm_clean = grepl("Data cleaning, organisation, documentation", rdm_aspects, ignore.case = T),
+                rdm_process = grepl("Data processing", rdm_aspects, ignore.case = T), 
+                rdm_store = grepl("Data storage", rdm_aspects, ignore.case = T), 
+                rdm_protect = grepl("Data protection", rdm_aspects, ignore.case = T), 
+                rdm_publish = grepl("Data publication", rdm_aspects, ignore.case = T), 
+                rdm_discover = grepl("Data discovery", rdm_aspects, ignore.case = T), 
+                rdm_analyse = grepl("Data analysis", rdm_aspects, ignore.case = T)
+                #rdm_integrity = grepl("integrity", rdm_aspects, ignore.case = T), 
+                #rdm_privacy = grepl("privacy|DPIA", rdm_aspects, ignore.case = T)
+                )
+
+rdm_df
+
+rdm_long <- rdm_df %>%
+  select(starts_with("rdm_")) %>%
+  select(-rdm_aspects) %>%
+  pivot_longer(
+    cols = starts_with("rdm_"),
+    names_to = "rdm",
+    names_pattern = "rdm_?(.*)"
+  ) %>%
+  mutate(d=case_when(value ~ 1, 
+                     !value ~ 0))
+rdm_long
+
+total = nrow(data)
+
+rdm_short <- rdm_long %>%
+  group_by(rdm) %>%
+  count(d) %>%
+  filter(d==1) %>%
+  mutate(perc= n/total*100) %>%
+  print()
+
+str(rdm_short$rdm)
+rdm.labs <- c("Data analysis", "Data cleaning & organisation", "Data Discovery", "Data management plan",
+              "Data processing", "Data protection",
+              #"Research integrity*", "Privacy issues*", 
+              "Data publication", "Data storage")
+names(rdm.labs) <- c("analyse", "clean", "discover", "dmp",
+                     "process", "protect", #"integrity", #"privacy", 
+                     "publish", "store")
+
+
+ggplot(rdm_short, aes(x = reorder(rdm, +perc),y = perc)) +
+  geom_col(fill = odisseiblue) + 
+  labs(x = "RDM aspect covered", y = "%") +
+  scale_x_discrete(labels = rdm.labs) + 
+  coord_flip() +
+  theme_classic()
+ggsave("RDM_aspects.jpg")
+
+# only ssh 
+rdm_ssh <- data %>% filter(ssh==1) %>% select(id, rdm_aspects)
+rdm_ssh <- transform(rdm_ssh, 
+                    rdm_dmp = grepl("management plan", rdm_aspects, ignore.case = T), 
+                    rdm_clean = grepl("Data cleaning, organisation, documentation", rdm_aspects, ignore.case = T),
+                    rdm_process = grepl("Data processing", rdm_aspects, ignore.case = T), 
+                    rdm_store = grepl("Data storage", rdm_aspects, ignore.case = T), 
+                    rdm_protect = grepl("Data protection", rdm_aspects, ignore.case = T), 
+                    rdm_publish = grepl("Data publication", rdm_aspects, ignore.case = T), 
+                    rdm_discover = grepl("Data discovery", rdm_aspects, ignore.case = T), 
+                    rdm_analyse = grepl("Data analysis", rdm_aspects, ignore.case = T)
+                    #rdm_integrity = grepl("integrity", rdm_aspects, ignore.case = T), 
+                    #rdm_privacy = grepl("privacy|DPIA", rdm_aspects, ignore.case = T)
+)
+
+rdm_ssh
+rdm_ssh_long <- rdm_ssh %>%
+  select(starts_with("rdm_")) %>%
+  select(-rdm_aspects) %>%
+  pivot_longer(
+    cols = starts_with("rdm_"),
+    names_to = "rdm",
+    names_pattern = "rdm_?(.*)"
+  ) %>%
+  mutate(d=case_when(value ~ 1, 
+                     !value ~ 0))
+rdm_ssh_long
+
+total_ssh = 23
+count(data, ssh)
+
+rdm_ssh_short <- rdm_ssh_long %>%
+  group_by(rdm) %>%
+  count(d) %>%
+  filter(d==1) %>%
+  mutate(perc= n/total_ssh*100) %>%
+  print()
+
+str(rdm_ssh_short$rdm)
+#rdm.labs <- c("Data analysis", "Data cleaning & organisation", "Data Discovery", "Data management plan", "Research integrity*", 
+#              "Privacy issues*", "Data publication", "Data storage")
+#names(rdm.labs) <- c("analyse", "clean", "discover", "dmp", "integrity", "privacy", "publish", "store")
+
+
+ggplot(rdm_ssh_short, aes(x = reorder(rdm, +perc),y = perc)) +
+  geom_col(fill = odisseiblue) + 
+  labs(x = "RDM aspect covered", y = "%") +
+  scale_x_discrete(labels = rdm.labs) + 
+  coord_flip() +
+  theme_classic()
+
+ggplot(rdm_short, aes(x = reorder(rdm, +perc),y = perc)) +
+  geom_col(fill = odisseiblue) + 
+  labs(x = "RDM aspect covered", y = "%") +
+  scale_x_discrete(labels = rdm.labs) + 
+  coord_flip() +
+  theme_classic()
+
+# same thing.. 
+
+
+### challenges (% challenge) ------
+count(data, challenge_details)
+
+chall <- data %>%
+  select(c(id, starts_with("challenge"))) %>%
+  rename(extra = challenge_extra,
+         details = challenge_details) %>%
+  select(-c(extra, details)) %>%
+  mutate(across(c(starts_with("challenge")), ~ case_when(
+    . == "Highly Challenging" ~ "1",
+    . == "Somewhat challenging" ~ "1",
+    . == "Not challenging" ~ "0"))) %>%
+  mutate(across(c(starts_with("challenge")), ~na_if(. , "Not part of my responsibility"))) %>% print()
+
+# reshape
+chall_long <- chall %>%
+  select(starts_with("challenge_")) %>%
+  pivot_longer(
+    cols = starts_with("challenge_"),
+    names_to = "challenge",
+    names_pattern = "challenge_?(.*)"
+  ) %>%
+  group_by(challenge) %>%
+  count(value) %>% 
+  filter(!is.na(value)) %>%
+  mutate(tot = sum(n)) %>%
+  ungroup () %>%
+  filter(value==1) %>%
+  mutate(chall_per = n/tot*100) %>%
+  print()
+
+chall.labs = c("Data analysis", "Anonymization procedures", "Data Management Plan", 
+               "Data management workflows", "Implementation of FAIR", "Data protection (e.g. GDPR)", 
+               "Licensing options", "Implementation of Open Science", "Data storage")
+names(chall.labs) = c("analysis", "anonymization", "dmp", "dmworkflow", "FAIR", "gdpr", "license", "OS", "storage")
+chall_long$challenge
+
+ggplot(chall_long, aes(x=reorder(challenge, +chall_per), y=chall_per)) +
+  geom_col(fill = odisseiblue) +
+  scale_x_discrete(labels = chall.labs) +
+  labs(x = "RDM aspect", y = "% respondents (somewhat+highly challenging)") + 
+  geom_text(aes(y = 100+5, label = paste("N=", tot)), nudge_x = 0, nudge_y = 0) +
+    coord_flip() +
+  theme_classic()
+ggsave("challenges.png")
+
+ggplot(chall_long, aes(x=reorder(challenge, +tot))) +
+  #geom_col(aes(y = 27), fill = "grey75") +
+  geom_point(aes(y=tot), color = odisseiblue, fill = odisseiblue, shape = 21, size =3) +
+  geom_text(aes(y = tot, label = tot), nudge_x = 1, nudge_y = 1) +
+  geom_col(aes(y=n), fill = "orchid3") +
+  labs(x = "RDM aspect", y = "N") + 
+  scale_x_discrete(labels = chall.labs) +
+  coord_flip() +
+  theme_classic()
+  
+
+
+
+
+
+count(data, challenge_extra) %>% print(n=30)
+
+
+
+# count valid values
+# count 1s 
+# 1/valid values
+
+
+
+
+### website -------------
+count(data, useful_webpage)
+tuse <- as.data.frame(prop.table(table(data$useful_webpage)))
+#levels(tuse$Var1)[length(levels(tuse$Var1))+1] <- "1 (not useful at all)"
+#tuse[nrow(tuse)+1, 1] = "1 (not useful at all)"
+#tuse[nrow(tuse), 2] = 0
+tuse
+
+tuse$Var1 = factor(tuse$Var1, levels = c("1 (not useful at all)", 
+                                         "2", "3", "4", 
+                                         "5  (very useful)"))
+
+levels(tuse$Var1)
+
+ggplot(tuse, aes(y = as.integer(Freq*100), x = Var1)) +
+  geom_col(fill = odisseiblue) + 
+  labs(x = "Perceived usefulness of website", y = "%") +
+  scale_y_continuous(breaks = c(0, 15, 30, 45), limits = c(0, 50)) +
+  coord_flip() + 
+  theme_classic()
+
+ggsave('useful_website.png')
+
+## Resources ----
+count(data, resources_select)
+
+res_df <- data %>% select(id, resources_select)
+res_df <- transform(res_df, 
+                    res_intro = grepl("introduction to fair data", resources_select, ignore.case = T), 
+                    res_train = grepl("training materials", resources_select, ignore.case = T),
+                    res_tools = grepl("Tools for checking fairness", resources_select, ignore.case = T), 
+                    res_testimonials = grepl("Testimonials", resources_select, ignore.case = T), 
+                    res_case = grepl("case studies", resources_select, ignore.case = T), 
+                    res_rdm = grepl("research data management", resources_select, ignore.case = T), 
+                    res_ethic = grepl("ethical issues", resources_select, ignore.case = T), 
+                    res_technical = grepl("technical implementation", resources_select, ignore.case = T), 
+                    res_gdpr = grepl("GDPR", resources_select, ignore.case = T), 
+                    res_os = grepl("open science", resources_select, ignore.case = T)
+)
+
+res_df
+
+res_long <- res_df %>%
+  select(starts_with("res_")) %>%
+  pivot_longer(
+    cols = starts_with("res_"),
+    names_to = "res",
+    names_pattern = "res_?(.*)"
+  ) %>%
+  mutate(d=case_when(value ~ 1, 
+                     !value ~ 0))
+res_long
+
+total = nrow(data)
+
+res_short <- res_long %>%
+  group_by(res) %>%
+  count(d) %>%
+  filter(d==1) %>%
+  mutate(perc= n/total*100) %>%
+  print()
+
+
+
+res.labs = c("FAIR data case studies", "Ethical issues with FAIR data", 
+             "GDPR and sensitive data", "Introduction to FAIR", "Open Science", 
+             "Research data management", "Technical implementation of FAIR", 
+             "Testimonials and interviews", "Tools for checking FAIRness", 
+             "Training materials on FAIR data")
+names(res.labs) = c("case", "ethic","gdpr", "intro", "os", "rdm",        
+                    "technical","testimonials", "tools", "train" )
+
+ggplot(res_short, aes(x = reorder(res, +perc), y = perc)) +
+  geom_col(fill = odisseiblue) +
+  scale_x_discrete(labels = res.labs) +
+  scale_y_continuous(limits=c(0, 100), breaks = c(0, 25, 50, 75, 100)) + 
+  labs(x = "Desirable resources on website", y = "%") + 
+  coord_flip() +
+  #coord_polar(theta = "x", direction = -1) + 
+  theme_classic()
+ggsave("resources_website.png")
+
+
+
+
+
