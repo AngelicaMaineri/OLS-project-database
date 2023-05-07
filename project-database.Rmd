@@ -1,0 +1,22 @@
+---
+title: "project-database"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+suppressWarnings(library(DT))
+suppressWarnings(library(tidyverse))
+```
+
+This is a prototype of a database of OLS projects.
+
+```{r loaddata}
+df = read_csv("Data-enrichment/Data/projects.csv")
+DT::datatable(df, escape = FALSE,
+              filter = "top", 
+              options = list(dom = "ft", 
+                            pageLength = 1000))
+```
+
+
