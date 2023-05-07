@@ -33,10 +33,13 @@ _This project is carried out in the framework of OLS-7_
 
 ```{r loaddata}
 df = read_csv("./Data-enrichment/Data/projects.csv")
+df = df |>
+  rename(title=name)
 DT::datatable(df, escape = FALSE,
               filter = "top", 
               options = list(dom = "ft", 
-                            pageLength = 1000))
+                            pageLength = 1000),
+              rownames = FALSE)
 ```
 
 
