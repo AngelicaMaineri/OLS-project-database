@@ -1,0 +1,42 @@
+---
+title: "Prototype of OLS-project database"
+author: 
+  name: "Angelica Maineri"
+  email: "angelica@odissei-data.nl"
+  affiliation: "Erasmus University Rotterdam - ODISSEI"
+date: '`r Sys.Date()`'
+knit: (function(inputFile, encoding) {
+  rmarkdown::render(inputFile, encoding = encoding, output_file="./docs/index.html") })
+output: 
+  html_document:
+    theme: united
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+suppressWarnings(library(DT))
+suppressWarnings(library(tidyverse))
+```
+Hello! Thank you for your interest in my project.
+
+[Open Life Science - OLS](https://openlifesci.org/) is a mentorship programme to learn more about Open Science and Open Leadership, and mentees carry out individual or group projects. With over 200 projects, the list is now very rich yet also difficult to navigate. The aim of my project is to build a searchable database of OLS projects, for future, current and past OLS participants.
+
+Thanks to my database, it will be possible to browse all projects from one page, filter them based on keywords and/or project members, and track the projects progress and outputs.
+
+You can see a protype of the database below!
+
+Contribution guidelines will follow soon. In the meantime, if you have ideas or comments, please open an issue or reach out to Angelica Maineri
+
+_This project is carried out in the framework of OLS-7_
+
+## Prototype
+
+```{r loaddata}
+df = read_csv("./Data-enrichment/Data/projects.csv")
+DT::datatable(df, escape = FALSE,
+              filter = "top", 
+              options = list(dom = "ft", 
+                            pageLength = 1000))
+```
+
+
