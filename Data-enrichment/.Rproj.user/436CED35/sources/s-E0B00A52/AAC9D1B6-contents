@@ -20,9 +20,17 @@ library(RColorBrewer)
 install.packages("wordcloud2")
 library(wordcloud2)
 
+# for embeddings
+install.packages("word2vec")
+library(word2vec)
 
 ## 2. Load data ----
 df = read_delim("Data/projects.csv")
+domains = read_delim("Data/domains.csv")
+
+# Create list domain
+# Science = Astronomy, Chemistry, Computer Science, Earth Sciences, Life Sciences, Mathematics and Physics.
+# SSH = 
 
 ## 3. Prepare data ----
 # rename name field to title
@@ -50,6 +58,7 @@ df2 = df |>
 
 df2 = df2 |>
   dplyr::select(c("keywords", "id")) |>
+  mutate(keywords = tolower(keywords)) |> # remove capitalization to avoid duplication
   print(n=100)
 
 # make list of unique keywords, remove duplicates
@@ -59,15 +68,42 @@ df2 = df2 |>
 df3 = df2 |>
   mutate(n=1) |>
   dplyr::select("keywords", "n") |>
-  mutate(keywords = tolower(keywords)) |> # remove capitalization to avoid duplication
   group_by(keywords) |>
   count(n) |>
   ungroup() |>
   print()
 
+# remove capitalisation
+domains = domains |>
+  mutate(domain=tolower(domain), 
+         discipline=tolower(discipline))
 
+(listdf3 = unique(df3$keywords))  
 
 ## 4. Wordcloud -----
 set.seed(42) # for reproducibility 
 (wc1 = wordcloud(words = df3$keywords, freq = df3$nn, min.freq = 1, max.freq = 50, colors=brewer.pal(8, "Dark2")))
 
+## 5. String match
+(unique(df2$keywords)%in%unique(domains$discipline))
+
+write.csv(df2, file = "data/keywords.csv")
+
+df_enriched = left_join(df2, domains, by=c("keywords" = "discipline"))
+
+count(df_enriched, domain)
+
+df_dom = left_join(df, df_enriched, by="id", multiple = "any") |>
+  dplyr::select(!keywords.y, !row) |>
+  rename(keywords = keywords.x) |>
+  print(n=100) 
+  
+col_order <- c("id", "title","participants","mentors","description","cohort", "keywords", "status", "domain")
+df_dom = df_dom[, col_order]
+
+# export
+write.csv(df_dom, file="projects_domain.csv")
+
+## Next steps
+#' Improve domains classification
+#' Add "open science" or similar; add 'community building"

@@ -1,0 +1,125 @@
+domain,discipline
+LSH,Biology
+LSH,Veterinary medicine
+LSH,Medicine
+LSH,Life Sciences
+NES,Astronomy
+NES,Chemistry
+NES,Computer Science
+NES,Earth Sciences
+NES,Life Sciences
+NES,Mathematics
+NES,Physics
+NES,Science and technology
+NES,Technology
+SSH,Archaeology
+SSH,Area studies
+SSH,Art and architecture
+SSH,Business administration
+SSH,Communication sciences
+SSH,Computers and the humanities
+SSH,Cultural anthropology
+SSH,Demography
+SSH,Development studies
+SSH,Economics
+SSH,Environmental science
+SSH,Gender studies
+SSH,Geography / planning
+SSH,History
+SSH,History of science
+SSH,Language and literature
+SSH,Law
+SSH,Linguistics
+SSH,"Music, theatre, performing arts and media"
+SSH,Pedagogics
+SSH,Philosophy
+SSH,Psychology
+SSH,Public administration and political science
+SSH,Religious studies and theology
+SSH,Science of Teaching
+SSH,Sociology
+All,data science
+LSH,quantitative life science
+LSH,systems biology
+LSH,actigraphy
+LSH,actimetry
+NES,agriculture
+NES,agrobiodiversity
+NES,astrobiology
+SSH,australian archaeology
+NES,biodiversity
+NES,biodiversity informatics
+SSH,bibliometrics
+LSH,bioinformatics
+NES,biometric technology
+LSH,bladder cancer
+LSH,cancer
+NES,chemical space
+NES,chemistry
+LSH,chronobiology
+LSH,circadian rhythms
+LSH,clinical neuroscience
+LSH,cognitive neuroscience
+LSH,computational biology
+SSH,computational social science
+LSH,diabetes
+LSH,diagnostics
+LSH,digital health
+LSH,digital pathology
+NES,drilling fluid
+NES,ecology
+NES,ecophysiology
+NES,environmental biotechnology
+SSH,epistemic/linguistic
+NES,environmental science
+LSH,extra-uterin growth failure
+NES,forestry
+LSH,genetic engineering
+LSH,genomics
+LSH,genomics medicine
+SSH,geography
+NES,geology
+NES,geomorphology
+LSH,gut microbiome
+LSH,health outcomes
+LSH,health reseach
+LSH,health research institutes
+LSH,healthcare
+SSH,history of science
+SSH,humanities
+SSH,law
+SSH,legal research
+LSH,metagenomics
+LSH,molecular biology
+LSH,molecular diagnostics
+LSH,neglected tropical disease
+LSH,neuroimaging
+LSH,neuropsychology
+LSH,neuroscience
+LSH,obesity
+NES,palaeobotany
+NES,palaeoecology
+NES,palaeoenvironment
+NES,palynology
+SSH,pedagogy
+SSH,philosophy of science
+NES,planetary sciences
+NES,pleiotropy
+NES,polar science
+LSH,population genetics
+LSH,prostate cancer
+LSH,proteomics
+SSH,psychology
+NES,river and freshwater ecology
+LSH,rna-seq
+NES,robotics
+LSH,sars coronavirus 3c-like proteinase
+NES,semantic technology
+LSH,sleep deprivation
+NES,soil physics
+NES,space science
+LSH,synthetic biology
+LSH,transcriptomics
+SSH,urban data science
+NES,wood formation
+NES,xylogenesis
