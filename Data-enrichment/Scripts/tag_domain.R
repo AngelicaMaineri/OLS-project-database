@@ -13,15 +13,15 @@
 library(tidyverse) # for most operations
 
 # for wordclouds
-install.packages("wordcloud")
+#install.packages("wordcloud")
 library(wordcloud)
-install.packages("RColorBrewer")
+#install.packages("RColorBrewer")
 library(RColorBrewer)
-install.packages("wordcloud2")
+#install.packages("wordcloud2")
 library(wordcloud2)
 
 # for embeddings
-install.packages("word2vec")
+#install.packages("word2vec")
 library(word2vec)
 
 ## 2. Load data ----
@@ -59,8 +59,11 @@ df2 = df |>
 df2 = df2 |>
   dplyr::select(c("keywords", "id")) |>
   mutate(keywords = tolower(keywords)) |> # remove capitalization to avoid duplication
+  mutate(keywords = str_trim(keywords, "right")) |>  #remove all trailing whitespace
+  mutate(keywords = str_trim(keywords, "left")) |> #remove all leading whitespace
   print(n=100)
 
+  
 # make list of unique keywords, remove duplicates
 (list = unique(df2$keywords))  
 
@@ -75,19 +78,18 @@ df3 = df2 |>
 
 # remove capitalisation
 domains = domains |>
-  mutate(domain=tolower(domain), 
-         discipline=tolower(discipline))
+  mutate(discipline=tolower(discipline))
 
 (listdf3 = unique(df3$keywords))  
 
 ## 4. Wordcloud -----
 set.seed(42) # for reproducibility 
-(wc1 = wordcloud(words = df3$keywords, freq = df3$nn, min.freq = 1, max.freq = 50, colors=brewer.pal(8, "Dark2")))
+#(wc1 = wordcloud(words = df3$keywords, freq = df3$nn, min.freq = 1, max.freq = 50, colors=brewer.pal(8, "Dark2")))
 
 ## 5. String match
 (unique(df2$keywords)%in%unique(domains$discipline))
 
-write.csv(df2, file = "data/keywords.csv")
+#write.csv(df2, file = "data/keywords.csv")
 
 df_enriched = left_join(df2, domains, by=c("keywords" = "discipline"))
 
@@ -100,9 +102,11 @@ df_dom = left_join(df, df_enriched, by="id", multiple = "any") |>
   
 col_order <- c("id", "title","participants","mentors","description","cohort", "keywords", "status", "domain")
 df_dom = df_dom[, col_order]
+df_dom
 
 # export
-write.csv(df_dom, file="projects_domain.csv")
+write.csv(df_dom, file="Data/projects_domain.csv", fileEncoding = "UTF-8")
+
 
 ## Next steps
 #' Improve domains classification
