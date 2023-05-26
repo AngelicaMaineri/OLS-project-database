@@ -35,7 +35,7 @@ The tagging of the domain is currently just a first attempt based on some keywor
 ## Prototype
 
 ```{r loaddata}
-df = read_csv("./Data-enrichment/Data/projects_domain.csv")
+df = read_csv("./Data-enrichment/Data/projects_domain_people.csv")
 DT::datatable(df, escape = FALSE,
               filter = "top", 
               options = list(dom = "ft", 

@@ -25,7 +25,8 @@ library(wordcloud2)
 library(word2vec)
 
 ## 2. Load data ----
-df = read_delim("Data/projects.csv")
+#df = read_delim("Data/projects_copied.csv") # Load local copy (not updated)
+df = read_delim("C:/Users/angel/Documents/GitHub/ols-program-paper/data/projects.csv") # Load updated copy from the paper repo
 domains = read_delim("Data/domains.csv")
 
 # Create list domain
