@@ -7,4 +7,6 @@ Thanks to my database, it will be possible to browse all projects from one page,
 
 Contribution guidelines will follow soon. In the meantime, if you have ideas or comments, please open an issue or reach out to [Angelica Maineri](mailto:angelica@odissei-data.nl)
 
+The prototype of the database can be seen at [https://angelicamaineri.github.io/OLS-project-database/](https://angelicamaineri.github.io/OLS-project-database/)
+
 _This project is carried out in the framework of [OLS-7](https://openlifesci.org/ols-7)_
