@@ -3,7 +3,7 @@
     "path": "~/GitHub/OLS-project-database/project-database.Rmd",
     "project_path": null,
     "type": "r_markdown",
-    "hash": "3455631631",
+    "hash": "2227599466",
     "contents": "",
     "dirty": false,
     "created": 1685110954314.0,
@@ -12,15 +12,16 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "37,60",
-        "scrollLine": "20"
+        "cursorPosition": "37,26",
+        "scrollLine": "33",
+        "last_setup_crc32": "04F6F521fb1f6665"
     },
     "folds": "",
-    "lastKnownWriteTime": 1685110965,
+    "lastKnownWriteTime": 1685112506,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1685110965948,
+    "last_content_update": 1685112506984,
     "read_only": false,
     "read_only_alternatives": []
 }

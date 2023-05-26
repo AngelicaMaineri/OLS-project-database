@@ -98,7 +98,7 @@ df_wide$participants
 df_wide = df_wide |>
   select(-c("part1", "part2", "part3", "part4", "part5", "part6"))
 
-col_order <- c("...1", "id", "title", "participants", "mentors","description", "cohort","keywords", "status", "domain")
+col_order <- c("id", "title", "participants", "mentors","description", "cohort","keywords", "status", "domain")
 df2 <- df_wide[, col_order]
 
 
