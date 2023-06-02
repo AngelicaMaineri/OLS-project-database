@@ -30,12 +30,26 @@ This step is not mandatory, but often needed. From the initial spreadsheet, you 
 In my case, I wanted to enrich the initial dataset in several ways:
 - Add the domain; in this case I decided to use some very coarse categories based on the way the Dutch research council classifies domains: LSH = life sciences and health; NES = Natural and Engineering Sciences; SSH = Social Sciences and Humanities. I didn't want to tag each project manually, so I tried to map keywords to domains (the mapping is in [./Data-enrichment/Data/domains.csv](./Data-enrichment/Data/domains.csv)) to then tag the projects automatically based on the keywords. The script can be found in [./Data-enrichment/Scripts/1_tag_domain.R](./Data-enrichment/Scripts/1_tag_domain.R). Unfortunately, not many projects have a matching domain based on the keywords. See the section "Next steps" to read some ideas on how to improve this. 
 - I wanted to add the links to the github profiles of all the people mentioned (participants and mentors). The steps to do it in practice are included in [./Data-enrichment/Scripts/2_tag_people.R](./Data-enrichment/Scripts/2_tag_people.R)
+At the end of this phase, I exported a [processed and enriched .csv file](./Data-enrichment/Data/projects_domain_people.csv).
+
+As a side output, since I was working with the keywords, I also made a wordcloud of keywords! See [./Data-enrichment/wordcloud_1.pdf]{./Data-enrichment/wordcloud_1.pdf).
+
 
 ## Phase 3: Prepare table
-Compile markdown and export html
+At this point, you should have a spreadsheet (I had a .csv) which is actually the table you want to display. In this phase, you create a Rmarkdown file, which will become eventually the webpage you display via GitHub pages. That means you can write text and explanations as you see fit, using Markdown language. 
+
+In my [RMarkdown](./project-database.Rmd), I first load two packages (tidyverse and DT), I then load the .csv file and display it using the datatable function, and finally 'knit' all this into an html file named [index.html](./docs/index.html), which I save in a new folder [docs](./docs). You can check the datatable documentation to change the display and functionalities of the table (e.g. including search bars for each column, deciding how many rows to be displayed by default, exclude some columns, etc.).
 
 ## Phase 4: Publish
-Publish github page
+At this point, you can just go to the settings of your (public) GitHub repository, go to Pages, and deploy from main/docs. On the top of the page, the URL to your Page will be available. Congrats!
 
-# How to update the table
-## 
+# How to update the page
+## Step 1
+## Step 2
+## Step 3
+## Step 4
+
+# Next steps
+
+
+
