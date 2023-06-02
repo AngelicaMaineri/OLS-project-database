@@ -61,6 +61,7 @@ colnames(df_people_small)
 cols = c("name", "gitfull")
 df_people_small = df_people_small[, cols] 
 
+## Participants ---------
 # split participants
 df = df |>
   separate(participants, into = c("part1", "part2", "part3", "part4", "part5", "part6"), sep=",[ ]" ) |>
@@ -94,9 +95,49 @@ df_wide = df_wide|>
       part2!="<a href=\"NA\">NA</a>" & part3!="<a href=\"NA\">NA</a>" & part4!="<a href=\"NA\">NA</a>" & part5!="<a href=\"NA\">NA</a>" & part6!="<a href=\"NA\">NA</a>" ~ paste(part1, part2, part3, part4, part5, part6, sep=", ")))
 df_wide$participants
 
+### Mentors  ------
+# split participants
+df = df |>
+  separate(mentors, into = c("ment1", "ment2", "ment3"), sep=",[ ]" ) |>
+  print(n=100)
+
+# long format
+df_long2 = df |>
+  gather(mentnum, name, ment1:ment3, factor_key=TRUE)
+
+# if df$part1-6 in df_people_small, then change string to [df_part1-6](gitfull)
+df_long2 = left_join(df_long2, df_people_small, by=c("name"))
+df_long2 = df_long2 |>
+  mutate(name = paste("<a href=\"", gitfull, "\">", name, "</a>", sep = "")) |> #   <a href="https://pypi.org/project/plenpy/">plenoptic</a>
+  
+  #mutate(name = paste("[", name, "](", gitfull, ")", sep = "")) |> 
+  select(-c("gitfull"))
+df_long2
+
+# back to wide format
+df_long2$id <- factor(df_long2$id) 
+df_wide2 = df_long2 |>
+  pivot_wider(names_from = mentnum, values_from = name)
+
+df_wide2 = df_wide2|>
+  mutate(mentors = case_when(
+    ment2=="<a href=\"NA\">NA</a>" & ment3=="<a href=\"NA\">NA</a>" ~ paste(ment1),  
+    ment2!="<a href=\"NA\">NA</a>" & ment3=="<a href=\"NA\">NA</a>" ~ paste(ment1, ment2, sep=", "),
+    ment2!="<a href=\"NA\">NA</a>" & ment3!="<a href=\"NA\">NA</a>" ~ paste(ment1, ment2, ment3, sep=", ")))
+df_wide2$mentors
+
+
 # clean
 df_wide = df_wide |>
   select(-c("part1", "part2", "part3", "part4", "part5", "part6"))
+
+df_wide2 = df_wide2 |>
+  select(c("id", "mentors"))
+
+df_wide = left_join(df_wide, df_wide2, by=c("id"))
+df_wide = df_wide |> 
+  select(-c("mentors.x")) |>
+  rename(mentors=mentors.y)
 
 col_order <- c("id", "title", "participants", "mentors","description", "cohort","keywords", "status", "domain")
 df2 <- df_wide[, col_order]
