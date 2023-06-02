@@ -28,7 +28,8 @@ In my case, I wanted a list of the OLS projects that are already [listed on the 
 This step is not mandatory, but often needed. From the initial spreadsheet, you might need to clean your data, rearrange columns, add information, you name it. I prefer to do this as much as possible via scripts to keep track of the changes. 
 
 In my case, I wanted to enrich the initial dataset in several ways:
-
+- Add the domain; in this case I decided to use some very coarse categories based on the way the Dutch research council classifies domains: LSH = life sciences and health; NES = Natural and Engineering Sciences; SSH = Social Sciences and Humanities. I didn't want to tag each project manually, so I tried to map keywords to domains (the mapping is in [./Data-enrichment/Data/domains.csv](./Data-enrichment/Data/domains.csv)) to then tag the projects automatically based on the keywords. The script can be found in [./Data-enrichment/Scripts/1_tag_domain.R](./Data-enrichment/Scripts/1_tag_domain.R). Unfortunately, not many projects have a matching domain based on the keywords. See the section "Next steps" to read some ideas on how to improve this. 
+- I wanted to add the links to the github profiles of all the people mentioned (participants and mentors). The steps to do it in practice are included in [./Data-enrichment/Scripts/2_tag_people.R](./Data-enrichment/Scripts/2_tag_people.R)
 
 ## Phase 3: Prepare table
 Compile markdown and export html
