@@ -44,10 +44,15 @@ In my [RMarkdown](./project-database.Rmd), I first load two packages (tidyverse 
 At this point, you can just go to the settings of your (public) GitHub repository, go to Pages, and deploy from main/docs. On the top of the page, the URL to your Page will be available. Congrats!
 
 # How to update the page
-## Step 1
-## Step 2
-## Step 3
-## Step 4
+- Make sure you have access to an updated version of [projects.csv](https://github.com/open-life-science/ols-program-paper/blob/main/data/projects.csv) and [people.csv](https://github.com/open-life-science/ols-program-paper/blob/main/data/people.csv) from[https://github.com/open-life-science/ols-program-paper/data](https://github.com/open-life-science/ols-program-paper/data)
+- Open [./Data-enrichment/Data-enrichment.Rproj](./Data-enrichment/Data-enrichment.Rproj)
+- Run [1_tag_domain.R](./Data-enrichment/Scripts/1_tag_domain.R)
+- Run [2_tag_people.R](./Data-enrichment/Scripts/2_tag_people.R)
+- Save df2 and export [./Data-enrichment/Data/projects_domain_people.csv](./Data-enrichment/Data/projects_domain_people.csv)
+- Run [project-database.Rmd](./project-database.Rmd)
+- (check that you indeed saved [index.html](./docs/index.html) in the docs folder)
+- Commit changes and push to origin
+- Admire your work on https://angelicamaineri.github.io/OLS-project-database/
 
 # Next steps
 
