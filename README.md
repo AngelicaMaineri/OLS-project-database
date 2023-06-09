@@ -55,6 +55,10 @@ At this point, you can just go to the settings of your (public) GitHub repositor
 - Admire your work on https://angelicamaineri.github.io/OLS-project-database/
 
 # Next steps
+Here are some ideas/suggestions for next steps. They might be helpful to someone who might want to pick this up as their own OLS project in a future cohort!
+1. Enrich data. The dataset could be enriched with many more information that could help finding and sorting projects, but also getting insights. For instance, links to related materials (e.g. slides on Zenodo, links to repositories). 
+2. Automate the enrichments. Somebody who is more familiar with NLP techniques may be able to extract information and annotations from the projects’ descriptions.
+3. Embed prototype in the OLS website. It would be nice if the database became part of the projects’ page on the OLS website, and in the process the interface could be improved and rendered in a more aesthetically pleasing way. 
 
 
 
