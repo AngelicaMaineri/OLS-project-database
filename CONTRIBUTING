@@ -1,0 +1,22 @@
+# How to contribute to the OLS Project Database
+Thank you for your time looking at the project's repository! To get an overview of the project and the workflow, read the [README](./README.md). Here are some general resources to help you contributing to the repository:
+
+- [Finding ways to contribute to open source on GitHub](https://docs.github.com/en/get-started/exploring-projects-on-github/finding-ways-to-contribute-to-open-source-on-github)
+- [Set up Git](https://docs.github.com/en/get-started/quickstart/set-up-git)
+- [GitHub flow](https://docs.github.com/en/get-started/quickstart/github-flow)
+- [Collaborating with pull requests](https://docs.github.com/en/github/collaborating-with-pull-requests)
+
+# Option 1: Create an issue
+From the GitHub web interface, click on Issues and create a New Issue. Please add a short and informative title, explain your suggestions in the Comments field, and submit the issue.
+
+# Option 2: Send a Pull Request
+You can propose changes by forking the repository and sending a pull request. I recommend following existing instructions, such as the ones [at this link](https://docs.github.com/en/github/collaborating-with-pull-requests).
+
+# Option 3: Send an email
+If you don't have a GitHub account, or if for any reason you prefer to send an email, please feel free to do so and contact [Angelica Maineri](mailto:angelica@odissei-data.nl).
+
+# List yourself as contributor
+When you are done, please edit the [contributors list](./CONTRIBUTORS.md) and add your name, affiliation and ORCID at your own discretion.
+
+# Coming soon: Annotation guidelines
+Do you want to contribute annotating and enriching the data? Keep an eye on the main OLS repository, more information will be shared there soon.
