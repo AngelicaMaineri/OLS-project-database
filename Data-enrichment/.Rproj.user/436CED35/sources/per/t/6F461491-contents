@@ -85,7 +85,12 @@ domains = domains |>
 
 ## 4. Wordcloud -----
 set.seed(42) # for reproducibility 
-#(wc1 = wordcloud(words = df3$keywords, freq = df3$nn, min.freq = 1, max.freq = 50, colors=brewer.pal(8, "Dark2")))
+(wc1 = wordcloud(words = df3$keywords, freq = df3$nn, min.freq = 1, max.freq = 18, colors=brewer.pal(8, "Dark2")))
+
+summary(df3$nn)
+
+? wordcloud
+
 
 ## 5. String match
 (unique(df2$keywords)%in%unique(domains$discipline))
