@@ -1,4 +1,4 @@
-# Building a project database of OLS projects
+# Building a searchable database of OLS projects
 Hello! Thank you for your interest in my project. 
 
 In this repository, I want to build a searchable database of OLS projects to make it easier to navigate them for past, current, and future OLS participants. [Open Life Science - OLS](https://openlifesci.org) is a mentorship programme to learn more about Open Science and Open Leadership, and mentees carry out individual or group projects. With over [200 projects](https://openlifesci.org/about#projects), the list is now very rich yet also difficult to navigate. The aim of my project is to build a searchable database of OLS projects, for future, current and past OLS participants.
